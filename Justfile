@@ -29,3 +29,10 @@ alias d := doc
 [private]
 do *args:
     cargo doc --open {{args}}
+
+# formats code
+format *args:
+    cargo fmt {{args}}
+
+[private]
+alias f := format
