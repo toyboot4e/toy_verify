@@ -42,7 +42,7 @@ impl ExecResult {
     }
 
     /// Returns the [`JudgeStatus`].
-    fn status(&self, expected: &str) -> JudgeStatus {
+    fn judge_status(&self, expected: &str) -> JudgeStatus {
         match self {
             ExecResult::TimedOut { .. } => JudgeStatus::TLE,
             ExecResult::Completed {
@@ -137,7 +137,6 @@ pub fn run_test_suite(
 ) -> Result<TestSummary> {
     let total_start = Instant::now();
     let mut results = Vec::new();
-    let mut all_ac = true;
 
     for case in cases {
         let exec = run_user_execute_command(user_execute_command, &case.input_path, tle)?;
@@ -148,13 +147,9 @@ pub fn run_test_suite(
                 case.output_path.display()
             )
         })?;
-        let status = exec.status(&expected);
+        let status = exec.judge_status(&expected);
+
         let elapsed = exec.elapsed();
-
-        if status != JudgeStatus::AC {
-            all_ac = false;
-        }
-
         eprintln!(
             "  {} ... {} ({:.3}s)",
             case.name,
@@ -181,6 +176,7 @@ pub fn run_test_suite(
 
     let total_elapsed = total_start.elapsed();
     let exec_elapsed: Duration = results.iter().map(|r| r.elapsed).sum();
+    let all_ac = results.iter().all(|r| r.status == JudgeStatus::AC);
 
     let ac_count = results
         .iter()

@@ -31,25 +31,25 @@ fn test_determine_status() {
         exitcode: 0,
         elapsed,
     };
-    assert_eq!(ac.status("42"), JudgeStatus::AC);
+    assert_eq!(ac.judge_status("42"), JudgeStatus::AC);
 
     let wa = ExecResult::Completed {
         stdout: "43\n".to_string(),
         exitcode: 0,
         elapsed,
     };
-    assert_eq!(wa.status("42"), JudgeStatus::WA);
+    assert_eq!(wa.judge_status("42"), JudgeStatus::WA);
 
     let re = ExecResult::Completed {
         stdout: "42\n".to_string(),
         exitcode: 1,
         elapsed,
     };
-    assert_eq!(re.status("42"), JudgeStatus::RE);
+    assert_eq!(re.judge_status("42"), JudgeStatus::RE);
 
     let tle = ExecResult::TimedOut {
         stdout: String::new(),
         elapsed,
     };
-    assert_eq!(tle.status("42"), JudgeStatus::TLE);
+    assert_eq!(tle.judge_status("42"), JudgeStatus::TLE);
 }
