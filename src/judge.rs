@@ -104,22 +104,23 @@ fn run_user_execute_command(
     let wait_result = child
         .wait_timeout(timeout)
         .context("failed to wait for command")?;
+    let elapsed = start.elapsed();
 
-    if wait_result.is_none() {
-        child.kill().ok();
-        child.wait().ok();
-        writer.join().ok();
-        let stdout_bytes = reader.join().unwrap_or_default();
-        return Ok(ExecResult::TimedOut {
-            stdout: String::from_utf8_lossy(&stdout_bytes).to_string(),
-            elapsed: start.elapsed(),
-        });
-    }
-
-    let status = wait_result.unwrap();
+    let status = match wait_result {
+        Some(status) => status,
+        None => {
+            child.kill().ok();
+            child.wait().ok();
+            writer.join().ok();
+            let stdout_bytes = reader.join().unwrap_or_default();
+            return Ok(ExecResult::TimedOut {
+                stdout: String::from_utf8_lossy(&stdout_bytes).to_string(),
+                elapsed,
+            });
+        }
+    };
     writer.join().ok();
     let stdout_bytes = reader.join().unwrap_or_default();
-    let elapsed = start.elapsed();
 
     Ok(ExecResult::Completed {
         stdout: String::from_utf8_lossy(&stdout_bytes).to_string(),
