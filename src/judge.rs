@@ -12,6 +12,7 @@ use wait_timeout::ChildExt;
 
 use anyhow::{Context, Result};
 
+use crate::problem::ProblemId;
 use crate::types::{JudgeStatus, TestCase, TestCaseResult, TestSummary};
 
 /// Execution result. `stderr` is immediately outputted to terminal and is lost.
@@ -134,6 +135,7 @@ pub fn run_test_suite(
     user_execute_command: &str,
     cases: &[TestCase],
     tle: Duration,
+    problem_id: &ProblemId,
 ) -> Result<TestSummary> {
     let total_start = Instant::now();
     let mut results = Vec::new();
@@ -185,9 +187,10 @@ pub fn run_test_suite(
         .filter(|r| r.status == JudgeStatus::AC)
         .count();
     eprintln!(
-        "\n{}/{} tests passed (exec {:.3}s / total {:.3}s)",
+        "\n{}/{} tests passed for {} (exec {:.3}s / total {:.3}s)",
         ac_count,
         results.len(),
+        problem_id,
         exec_elapsed.as_secs_f64(),
         total_elapsed.as_secs_f64()
     );

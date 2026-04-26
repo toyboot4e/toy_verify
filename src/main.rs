@@ -132,7 +132,7 @@ impl Test {
                 problem_id
             );
 
-            summaries.push(judge::run_test_suite(&execute_cmd, &cases, timeout)?);
+            summaries.push(judge::run_test_suite(&execute_cmd, &cases, timeout, &problem_id)?);
         }
 
         if !summaries.iter().all(|s| s.success) {
