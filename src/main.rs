@@ -23,7 +23,7 @@ struct Cli {
     command: Commands,
 
     /// Cache directory for repository and test cases
-    #[arg(long, default_value = ".toy_verify/cache")]
+    #[arg(long, default_value = "toy_verify/cache")]
     cache_dir: PathBuf,
 }
 
@@ -66,9 +66,9 @@ fn run() -> Result<()> {
                 None => bail!("invalid Library Checker URL: {}", url),
             };
 
-            let config_path = PathBuf::from(".toy_verify/config.toml");
+            let config_path = PathBuf::from("toy_verify/config.toml");
             let cfg = config::parse_config(&config_path)
-                .context("failed to load .toy_verify/config.toml")?;
+                .context("failed to load toy_verify/config.toml")?;
 
             let (info, cases) =
                 problem::download_and_generate(&cli.cache_dir, &problem_id, &url)?;
