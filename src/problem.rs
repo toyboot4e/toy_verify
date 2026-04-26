@@ -5,7 +5,7 @@ use std::sync::OnceLock;
 use anyhow::{bail, Context, Result};
 use regex::Regex;
 
-use crate::types::TestCase;
+use crate::types::{ProblemInfo, TestCase};
 
 static PULLED: OnceLock<bool> = OnceLock::new();
 
@@ -124,11 +124,21 @@ pub fn discover_test_cases(source_dir: &Path) -> Result<Vec<TestCase>> {
     Ok(cases)
 }
 
-pub fn download_and_generate(cache_dir: &Path, problem_id: &str) -> Result<Vec<TestCase>> {
+pub fn download_and_generate(
+    cache_dir: &Path,
+    problem_id: &str,
+    url: &str,
+) -> Result<(ProblemInfo, Vec<TestCase>)> {
     update_repository(cache_dir)?;
     generate_test_cases(cache_dir, problem_id)?;
     let source_dir = source_directory(cache_dir, problem_id)?;
-    discover_test_cases(&source_dir)
+    let cases = discover_test_cases(&source_dir)?;
+    let info = ProblemInfo {
+        problem_id: problem_id.to_string(),
+        url: url.to_string(),
+        source_dir,
+    };
+    Ok((info, cases))
 }
 
 #[cfg(test)]

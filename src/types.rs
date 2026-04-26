@@ -42,7 +42,9 @@ pub struct TestSummary {
     pub elapsed: Duration,
 }
 
-pub trait Language {
-    fn compile(&self, source: &std::path::Path) -> anyhow::Result<PathBuf>;
-    fn exec_command(&self, binary: &std::path::Path) -> String;
+#[derive(Debug, Clone)]
+pub struct ProblemInfo {
+    pub problem_id: String,
+    pub url: String,
+    pub source_dir: PathBuf,
 }
