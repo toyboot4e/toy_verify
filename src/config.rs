@@ -1,10 +1,11 @@
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
+use serde::Deserialize;
 
 use crate::types::ProblemInfo;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub compile: Option<String>,
     pub execute: String,
@@ -13,43 +14,12 @@ pub struct Config {
 pub fn parse_config(path: &Path) -> Result<Config> {
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read config file: {}", path.display()))?;
-
-    let mut compile = None;
-    let mut execute = None;
-
-    for line in content.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-
-        let Some((key, rest)) = line.split_once('=') else {
-            continue;
-        };
-        let key = key.trim();
-        let value = rest.trim();
-
-        // Strip surrounding quotes
-        let value = if (value.starts_with('"') && value.ends_with('"'))
-            || (value.starts_with('\'') && value.ends_with('\''))
-        {
-            &value[1..value.len() - 1]
-        } else {
-            value
-        };
-
-        match key {
-            "compile" => compile = Some(value.to_string()),
-            "execute" => execute = Some(value.to_string()),
-            _ => {}
-        }
+    let config: Config = toml::from_str(&content)
+        .with_context(|| format!("failed to parse config file: {}", path.display()))?;
+    if config.execute.is_empty() {
+        bail!("'execute' must not be empty in {}", path.display());
     }
-
-    let Some(execute) = execute else {
-        bail!("missing required key 'execute' in {}", path.display());
-    };
-
-    Ok(Config { compile, execute })
+    Ok(config)
 }
 
 pub fn expand(template: &str, info: &ProblemInfo) -> String {
@@ -126,6 +96,25 @@ mod tests {
         let config = parse_config(&path).unwrap();
         assert!(config.compile.is_none());
         assert_eq!(config.execute, "./run");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_parse_config_multiline() {
+        let dir = std::env::temp_dir().join("toy_verify_test_config_multiline");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.toml");
+        std::fs::write(
+            &path,
+            "compile = \"\"\"\ng++ -O2 \\\n  -o {problem} \\\n  {source_dir}/solution.cpp\n\"\"\"\nexecute = \"./{problem}\"\n",
+        )
+        .unwrap();
+
+        let config = parse_config(&path).unwrap();
+        assert!(config.compile.as_ref().unwrap().contains("-o {problem}"));
+        assert!(config.compile.as_ref().unwrap().contains("{source_dir}/solution.cpp"));
+        assert_eq!(config.execute, "./{problem}");
 
         std::fs::remove_dir_all(&dir).ok();
     }
