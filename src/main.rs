@@ -29,15 +29,15 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Download and generate test cases for a problem
+    /// Download and generate test cases for problems
     Download {
-        /// Problem URL (e.g. https://judge.yosupo.jp/problem/aplusb)
-        url: String,
+        /// Problem URLs (e.g. https://judge.yosupo.jp/problem/aplusb)
+        urls: Vec<String>,
     },
     /// Download test cases and run a solution against them
     Test {
-        /// Problem URL (e.g. https://judge.yosupo.jp/problem/aplusb)
-        url: String,
+        /// Problem URLs (e.g. https://judge.yosupo.jp/problem/aplusb)
+        urls: Vec<String>,
         /// Time limit in seconds
         #[arg(long)]
         tle: Option<f64>,
@@ -48,54 +48,62 @@ fn run() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Download { url } => {
-            let problem_id = problem::from_url(&url);
-            let problem_id = match problem_id {
-                Some(id) => id,
-                None => bail!("invalid Library Checker URL: {}", url),
-            };
+        Commands::Download { urls } => {
+            for url in &urls {
+                let problem_id = problem::from_url(url);
+                let problem_id = match problem_id {
+                    Some(id) => id,
+                    None => bail!("invalid Library Checker URL: {}", url),
+                };
 
-            let (_, cases) =
-                problem::download_and_generate(&cli.cache_dir, &problem_id, &url)?;
-            eprintln!("Downloaded {} test cases for '{}'", cases.len(), problem_id);
+                let (_, cases) =
+                    problem::download_and_generate(&cli.cache_dir, &problem_id, url)?;
+                eprintln!("Downloaded {} test cases for '{}'", cases.len(), problem_id);
+            }
         }
-        Commands::Test { url, tle } => {
-            let problem_id = problem::from_url(&url);
-            let problem_id = match problem_id {
-                Some(id) => id,
-                None => bail!("invalid Library Checker URL: {}", url),
-            };
-
+        Commands::Test { urls, tle } => {
             let config_path = PathBuf::from("toy_verify/config.toml");
             let cfg = config::parse_config(&config_path)
                 .context("failed to load toy_verify/config.toml")?;
+            let timeout = tle.map(Duration::from_secs_f64);
+            let mut all_success = true;
 
-            let (info, cases) =
-                problem::download_and_generate(&cli.cache_dir, &problem_id, &url)?;
+            for url in &urls {
+                let problem_id = problem::from_url(url);
+                let problem_id = match problem_id {
+                    Some(id) => id,
+                    None => bail!("invalid Library Checker URL: {}", url),
+                };
 
-            if let Some(ref compile_template) = cfg.compile {
-                let compile_cmd = config::expand(compile_template, &info);
-                eprintln!("Compiling: {}", compile_cmd);
-                let status = std::process::Command::new("sh")
-                    .args(["-c", &compile_cmd])
-                    .status()
-                    .context("failed to run compile command")?;
-                if !status.success() {
-                    bail!("compile command failed");
+                let (info, cases) =
+                    problem::download_and_generate(&cli.cache_dir, &problem_id, url)?;
+
+                if let Some(ref compile_template) = cfg.compile {
+                    let compile_cmd = config::expand(compile_template, &info);
+                    eprintln!("Compiling: {}", compile_cmd);
+                    let status = std::process::Command::new("sh")
+                        .args(["-c", &compile_cmd])
+                        .status()
+                        .context("failed to run compile command")?;
+                    if !status.success() {
+                        bail!("compile command failed for '{}'", problem_id);
+                    }
+                }
+
+                let execute_cmd = config::expand(&cfg.execute, &info);
+                eprintln!(
+                    "Running {} test cases for '{}'...\n",
+                    cases.len(),
+                    problem_id
+                );
+
+                let summary = judge::run_test_suite(&execute_cmd, &cases, None, timeout)?;
+                if !summary.success {
+                    all_success = false;
                 }
             }
 
-            let execute_cmd = config::expand(&cfg.execute, &info);
-            eprintln!(
-                "Running {} test cases for '{}'...\n",
-                cases.len(),
-                problem_id
-            );
-
-            let timeout = tle.map(Duration::from_secs_f64);
-            let summary = judge::run_test_suite(&execute_cmd, &cases, None, timeout)?;
-
-            if !summary.success {
+            if !all_success {
                 process::exit(1);
             }
         }
