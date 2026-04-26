@@ -131,6 +131,7 @@ pub fn download_and_generate(
     cache_dir: &Path,
     problem_id: &str,
     url: &str,
+    file: &Path,
 ) -> Result<(ProblemInfo, Vec<TestCase>)> {
     update_repository(cache_dir)?;
     generate_test_cases(cache_dir, problem_id)?;
@@ -140,6 +141,7 @@ pub fn download_and_generate(
         problem_id: problem_id.to_string(),
         url: url.to_string(),
         source_dir,
+        file: file.to_path_buf(),
     };
     Ok((info, cases))
 }

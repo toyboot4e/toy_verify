@@ -1,0 +1,7 @@
+# Compile command (optional) - skipped if absent
+# Available variables: {problem}, {url}, {source_dir}, {file}
+compile = "g++ -O2 -o {problem} {file}"
+
+# Execute command (required)
+# Available variables: {problem}, {url}, {source_dir}, {file}
+execute = "./{problem}"

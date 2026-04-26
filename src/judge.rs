@@ -30,47 +30,56 @@ fn run_command(command: &str, input_path: &Path, timeout: Option<Duration>) -> R
         .spawn()
         .context("failed to spawn command")?;
 
-    if let Some(stdin) = child.stdin.as_mut() {
-        stdin.write_all(&input).ok();
-    }
-    drop(child.stdin.take());
+    let mut stdin_handle = child.stdin.take();
+    let writer = std::thread::spawn(move || {
+        if let Some(ref mut stdin) = stdin_handle {
+            stdin.write_all(&input).ok();
+        }
+    });
+
+    let mut stdout_handle = child.stdout.take();
+    let reader = std::thread::spawn(move || -> Vec<u8> {
+        let mut buf = Vec::new();
+        if let Some(ref mut stdout) = stdout_handle {
+            std::io::Read::read_to_end(stdout, &mut buf).ok();
+        }
+        buf
+    });
 
     if let Some(tle) = timeout {
-        match child.try_wait() {
-            Ok(Some(_)) => {}
-            _ => {
-                std::thread::sleep(Duration::from_millis(10));
-                let deadline = start + tle;
-                loop {
-                    match child.try_wait() {
-                        Ok(Some(_)) => break,
-                        Ok(None) => {
-                            if Instant::now() >= deadline {
-                                child.kill().ok();
-                                child.wait().ok();
-                                let elapsed = start.elapsed();
-                                return Ok(ExecResult {
-                                    stdout: String::new(),
-                                    exitcode: None,
-                                    elapsed,
-                                    timed_out: true,
-                                });
-                            }
-                            std::thread::sleep(Duration::from_millis(50));
-                        }
-                        Err(e) => return Err(e.into()),
+        let deadline = start + tle;
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => break,
+                Ok(None) => {
+                    if Instant::now() >= deadline {
+                        child.kill().ok();
+                        child.wait().ok();
+                        writer.join().ok();
+                        reader.join().ok();
+                        let elapsed = start.elapsed();
+                        return Ok(ExecResult {
+                            stdout: String::new(),
+                            exitcode: None,
+                            elapsed,
+                            timed_out: true,
+                        });
                     }
+                    std::thread::sleep(Duration::from_millis(50));
                 }
+                Err(e) => return Err(e.into()),
             }
         }
     }
 
-    let output = child.wait_with_output().context("failed to wait for command")?;
+    let status = child.wait().context("failed to wait for command")?;
+    writer.join().ok();
+    let stdout_bytes = reader.join().unwrap_or_default();
     let elapsed = start.elapsed();
 
     Ok(ExecResult {
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        exitcode: output.status.code(),
+        stdout: String::from_utf8_lossy(&stdout_bytes).to_string(),
+        exitcode: status.code(),
         elapsed,
         timed_out: false,
     })

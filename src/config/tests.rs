@@ -96,8 +96,13 @@ fn test_expand_all_vars() {
         problem_id: "aplusb".to_string(),
         url: "https://judge.yosupo.jp/problem/aplusb".to_string(),
         source_dir: PathBuf::from("/tmp/problems/aplusb"),
+        file: PathBuf::from("example/aplusb.cpp"),
     };
 
+    assert_eq!(
+        expand("g++ -o {problem} {file}", &info),
+        "g++ -o aplusb example/aplusb.cpp"
+    );
     assert_eq!(
         expand("g++ -o {problem} {source_dir}/sol.cpp", &info),
         "g++ -o aplusb /tmp/problems/aplusb/sol.cpp"
@@ -115,6 +120,7 @@ fn test_expand_no_vars() {
         problem_id: "x".to_string(),
         url: "u".to_string(),
         source_dir: PathBuf::from("d"),
+        file: PathBuf::from("f"),
     };
 
     assert_eq!(expand("echo hello", &info), "echo hello");

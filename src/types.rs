@@ -47,4 +47,5 @@ pub struct ProblemInfo {
     pub problem_id: String,
     pub url: String,
     pub source_dir: PathBuf,
+    pub file: PathBuf,
 }

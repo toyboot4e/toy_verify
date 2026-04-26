@@ -1,6 +1,6 @@
 //! `toy_verify` is a tool for running online judge problem solutions.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 use std::time::Duration;
 
@@ -43,8 +43,8 @@ struct Download {
 
 #[derive(Parser)]
 struct Test {
-    /// Problem URLs (e.g. https://judge.yosupo.jp/problem/aplusb)
-    urls: Vec<String>,
+    /// Source files containing `[verify]: <URL>` directives
+    files: Vec<PathBuf>,
     /// Time limit in seconds
     #[arg(long)]
     tle: Option<f64>,
@@ -60,7 +60,7 @@ impl Download {
             };
 
             let (_, cases) =
-                problem::download_and_generate(cache_dir, &problem_id, url)?;
+                problem::download_and_generate(cache_dir, &problem_id, url, Path::new(""))?;
             eprintln!("Downloaded {} test cases for '{}'", cases.len(), problem_id);
         }
         Ok(())
@@ -68,6 +68,20 @@ impl Download {
 }
 
 impl Test {
+    fn extract_url(path: &Path) -> Result<Option<String>> {
+        let content = std::fs::read_to_string(path)
+            .with_context(|| format!("failed to read file: {}", path.display()))?;
+        for line in content.lines() {
+            if let Some(pos) = line.find("[verify]:") {
+                let rest = line[pos + "[verify]:".len()..].trim();
+                if !rest.is_empty() {
+                    return Ok(Some(rest.to_string()));
+                }
+            }
+        }
+        Ok(None)
+    }
+
     fn run(&self, cache_dir: &PathBuf) -> Result<()> {
         let config_path = PathBuf::from("toy_verify/config.toml");
         let cfg = config::parse_config(&config_path)
@@ -75,15 +89,23 @@ impl Test {
         let timeout = self.tle.map(Duration::from_secs_f64);
         let mut all_success = true;
 
-        for url in &self.urls {
-            let problem_id = problem::from_url(url);
+        for file in &self.files {
+            let url = match Self::extract_url(file)? {
+                Some(url) => url,
+                None => {
+                    eprintln!("warning: no [verify]: directive found in {}", file.display());
+                    continue;
+                }
+            };
+
+            let problem_id = problem::from_url(&url);
             let problem_id = match problem_id {
                 Some(id) => id,
                 None => bail!("invalid Library Checker URL: {}", url),
             };
 
             let (info, cases) =
-                problem::download_and_generate(cache_dir, &problem_id, url)?;
+                problem::download_and_generate(cache_dir, &problem_id, &url, file)?;
 
             if let Some(ref compile_template) = cfg.compile {
                 let compile_cmd = config::expand(compile_template, &info);

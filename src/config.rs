@@ -29,5 +29,6 @@ pub fn expand(template: &str, info: &ProblemInfo) -> String {
     template
         .replace("{problem}", &info.problem_id)
         .replace("{url}", &info.url)
-        .replace("{source_dir}", &info.source_dir.to_string_lossy())
+        .replace("{source_dir}", &info.source_dir.to_string_lossy().as_ref())
+        .replace("{file}", &info.file.to_string_lossy())
 }
