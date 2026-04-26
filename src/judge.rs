@@ -160,6 +160,7 @@ pub fn run_test_suite(
             elapsed.as_secs_f64()
         );
 
+        // for failure case, print stdout (TODO: print expected value, too, truncating some)
         if status != JudgeStatus::AC {
             let stdout = exec.stdout();
             if !stdout.is_empty() {
@@ -179,7 +180,6 @@ pub fn run_test_suite(
 
     let total_elapsed = total_start.elapsed();
     let exec_elapsed: Duration = results.iter().map(|r| r.elapsed).sum();
-    let all_ac = results.iter().all(|r| r.status == JudgeStatus::AC);
 
     // print the test suite result
     let ac_count = results
@@ -196,7 +196,7 @@ pub fn run_test_suite(
     );
 
     Ok(TestSummary {
-        success: all_ac,
+        success: results.iter().all(|r| r.status == JudgeStatus::AC),
         results,
         elapsed: total_elapsed,
     })
