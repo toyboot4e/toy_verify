@@ -1,3 +1,5 @@
+//! `toy_verify` is a tool for running online judge problem solutions.
+
 use std::path::PathBuf;
 use std::process;
 use std::time::Duration;
@@ -10,13 +12,16 @@ mod problem;
 mod types;
 
 #[derive(Parser)]
-#[command(name = "toy_verify", about = "Download and verify Library Checker problems")]
+#[command(
+    name = "toy_verify",
+    about = "Download and verify online judge problems"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
 
     /// Cache directory for repository and test cases
-    #[arg(long, default_value = ".cache")]
+    #[arg(long, default_value = ".toy_verify/cache")]
     cache_dir: PathBuf,
 }
 
@@ -61,7 +66,11 @@ fn run() -> Result<()> {
             };
 
             let cases = problem::download_and_generate(&cli.cache_dir, &problem_id)?;
-            eprintln!("Running {} test cases for '{}'...\n", cases.len(), problem_id);
+            eprintln!(
+                "Running {} test cases for '{}'...\n",
+                cases.len(),
+                problem_id
+            );
 
             let timeout = tle.map(Duration::from_secs_f64);
             let summary = judge::run_test_suite(&command, &cases, None, timeout)?;
