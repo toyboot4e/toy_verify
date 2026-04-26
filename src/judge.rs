@@ -179,15 +179,17 @@ pub fn run_test_suite(
     }
 
     let total_elapsed = total_start.elapsed();
+    let exec_elapsed: Duration = results.iter().map(|r| r.elapsed).sum();
 
     let ac_count = results
         .iter()
         .filter(|r| r.status == JudgeStatus::AC)
         .count();
     eprintln!(
-        "\n{}/{} tests passed ({:.3}s)",
+        "\n{}/{} tests passed (exec {:.3}s / total {:.3}s)",
         ac_count,
         results.len(),
+        exec_elapsed.as_secs_f64(),
         total_elapsed.as_secs_f64()
     );
 
