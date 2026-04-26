@@ -91,7 +91,7 @@ impl Test {
         let config_path = PathBuf::from("toy_verify/config.toml");
         let cfg =
             config::parse_config(&config_path).context("failed to load toy_verify/config.toml")?;
-        let timeout = self.tle.map(Duration::from_secs_f64);
+        let timeout = Duration::from_secs_f64(self.tle.unwrap_or(30.0));
         let mut all_success = true;
 
         for file in &self.files {

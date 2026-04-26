@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use super::*;
 
 #[test]
@@ -22,8 +24,32 @@ fn test_compare_output_mismatch() {
 
 #[test]
 fn test_determine_status() {
-    assert_eq!(determine_status(Some(0), true, false), JudgeStatus::AC);
-    assert_eq!(determine_status(Some(0), false, false), JudgeStatus::WA);
-    assert_eq!(determine_status(Some(1), true, false), JudgeStatus::RE);
-    assert_eq!(determine_status(None, false, true), JudgeStatus::TLE);
+    let elapsed = Duration::from_millis(100);
+
+    let ac = ExecResult::Completed {
+        stdout: "42\n".to_string(),
+        exitcode: 0,
+        elapsed,
+    };
+    assert_eq!(ac.status("42"), JudgeStatus::AC);
+
+    let wa = ExecResult::Completed {
+        stdout: "43\n".to_string(),
+        exitcode: 0,
+        elapsed,
+    };
+    assert_eq!(wa.status("42"), JudgeStatus::WA);
+
+    let re = ExecResult::Completed {
+        stdout: "42\n".to_string(),
+        exitcode: 1,
+        elapsed,
+    };
+    assert_eq!(re.status("42"), JudgeStatus::RE);
+
+    let tle = ExecResult::TimedOut {
+        stdout: String::new(),
+        elapsed,
+    };
+    assert_eq!(tle.status("42"), JudgeStatus::TLE);
 }

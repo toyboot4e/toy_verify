@@ -17,6 +17,7 @@ pub struct Config {
     pub execute: String,
 }
 
+/// Parses [`config.toml`].
 pub fn parse_config(path: &Path) -> Result<Config> {
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read config file: {}", path.display()))?;

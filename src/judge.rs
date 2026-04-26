@@ -12,18 +12,64 @@ use anyhow::{Context, Result};
 
 use crate::types::{JudgeStatus, TestCase, TestCaseResult, TestSummary};
 
-pub(crate) struct ExecResult {
-    stdout: String,
-    exitcode: Option<i32>,
-    elapsed: Duration,
-    timed_out: bool,
+/// Execution result. `stderr` is immediately outputted to terminal and is lost.
+pub(crate) enum ExecResult {
+    /// Not TLE.
+    Completed {
+        stdout: String,
+        exitcode: i32,
+        elapsed: Duration,
+    },
+    /// TLE.
+    TimedOut { stdout: String, elapsed: Duration },
+}
+
+impl ExecResult {
+    fn stdout(&self) -> &str {
+        match self {
+            ExecResult::Completed { stdout, .. } | ExecResult::TimedOut { stdout, .. } => stdout,
+        }
+    }
+
+    fn elapsed(&self) -> Duration {
+        match self {
+            ExecResult::Completed { elapsed, .. } | ExecResult::TimedOut { elapsed, .. } => {
+                *elapsed
+            }
+        }
+    }
+
+    /// Returns the [`JudgeStatus`].
+    fn status(&self, expected: &str) -> JudgeStatus {
+        match self {
+            ExecResult::TimedOut { .. } => JudgeStatus::TLE,
+            ExecResult::Completed {
+                stdout, exitcode, ..
+            } => {
+                if *exitcode != 0 {
+                    JudgeStatus::RE
+                } else if compare_output(stdout, expected) {
+                    JudgeStatus::AC
+                } else {
+                    JudgeStatus::WA
+                }
+            }
+        }
+    }
+}
+
+/// How we compare the result and the expected code. Currently, it's word_based.
+fn compare_output(actual: &str, expected: &str) -> bool {
+    let actual_words: Vec<&str> = actual.split_whitespace().collect();
+    let expected_words: Vec<&str> = expected.split_whitespace().collect();
+    actual_words == expected_words
 }
 
 // Runs user command and compares the result with the expected value.
 fn run_user_execute_command(
     user_execute_command: &str,
     input_path: &Path,
-    timeout: Option<Duration>,
+    timeout: Duration,
 ) -> Result<ExecResult> {
     let input = std::fs::read(input_path)
         .with_context(|| format!("failed to read input file: {}", input_path.display()))?;
@@ -53,29 +99,24 @@ fn run_user_execute_command(
         buf
     });
 
-    if let Some(tle) = timeout {
-        let deadline = start + tle;
-        loop {
-            match child.try_wait() {
-                Ok(Some(_)) => break,
-                Ok(None) => {
-                    if Instant::now() >= deadline {
-                        child.kill().ok();
-                        child.wait().ok();
-                        writer.join().ok();
-                        reader.join().ok();
-                        let elapsed = start.elapsed();
-                        return Ok(ExecResult {
-                            stdout: String::new(),
-                            exitcode: None,
-                            elapsed,
-                            timed_out: true,
-                        });
-                    }
-                    std::thread::sleep(Duration::from_millis(50));
+    let deadline = start + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) => {
+                if Instant::now() >= deadline {
+                    child.kill().ok();
+                    child.wait().ok();
+                    writer.join().ok();
+                    let stdout_bytes = reader.join().unwrap_or_default();
+                    return Ok(ExecResult::TimedOut {
+                        stdout: String::from_utf8_lossy(&stdout_bytes).to_string(),
+                        elapsed: start.elapsed(),
+                    });
                 }
-                Err(e) => return Err(e.into()),
+                std::thread::sleep(Duration::from_millis(50));
             }
+            Err(e) => return Err(e.into()),
         }
     }
 
@@ -84,43 +125,18 @@ fn run_user_execute_command(
     let stdout_bytes = reader.join().unwrap_or_default();
     let elapsed = start.elapsed();
 
-    Ok(ExecResult {
+    Ok(ExecResult::Completed {
         stdout: String::from_utf8_lossy(&stdout_bytes).to_string(),
-        exitcode: status.code(),
+        exitcode: status.code().unwrap_or(-1),
         elapsed,
-        timed_out: false,
     })
-}
-
-/// How we compare the result and the expected code. Currently, it's word_based.
-fn compare_output(actual: &str, expected: &str) -> bool {
-    let actual_words: Vec<&str> = actual.split_whitespace().collect();
-    let expected_words: Vec<&str> = expected.split_whitespace().collect();
-    actual_words == expected_words
-}
-
-/// Convers the execution result to [`JudgeStatus`] (AC, WA, RE, TLE).
-fn determine_status(exitcode: Option<i32>, matched: bool, timed_out: bool) -> JudgeStatus {
-    if timed_out {
-        return JudgeStatus::TLE;
-    }
-    match exitcode {
-        Some(0) => {
-            if matched {
-                JudgeStatus::AC
-            } else {
-                JudgeStatus::WA
-            }
-        }
-        _ => JudgeStatus::RE,
-    }
 }
 
 /// Runs one problem.
 pub fn run_test_suite(
     user_execute_command: &str,
     cases: &[TestCase],
-    tle: Option<Duration>,
+    tle: Duration,
 ) -> Result<TestSummary> {
     let total_start = Instant::now();
     let mut results = Vec::new();
@@ -129,19 +145,14 @@ pub fn run_test_suite(
     for case in cases {
         let exec = run_user_execute_command(user_execute_command, &case.input_path, tle)?;
 
-        let matched = if exec.timed_out {
-            false
-        } else {
-            let expected = std::fs::read_to_string(&case.output_path).with_context(|| {
-                format!(
-                    "failed to read expected output: {}",
-                    case.output_path.display()
-                )
-            })?;
-            compare_output(&exec.stdout, &expected)
-        };
-
-        let status = determine_status(exec.exitcode, matched, exec.timed_out);
+        let expected = std::fs::read_to_string(&case.output_path).with_context(|| {
+            format!(
+                "failed to read expected output: {}",
+                case.output_path.display()
+            )
+        })?;
+        let status = exec.status(&expected);
+        let elapsed = exec.elapsed();
 
         if status != JudgeStatus::AC {
             all_ac = false;
@@ -151,13 +162,23 @@ pub fn run_test_suite(
             "  {} ... {} ({:.3}s)",
             case.name,
             status,
-            exec.elapsed.as_secs_f64()
+            elapsed.as_secs_f64()
         );
+
+        if status != JudgeStatus::AC {
+            let stdout = exec.stdout();
+            if !stdout.is_empty() {
+                eprint!("{stdout}");
+                if !stdout.ends_with('\n') {
+                    eprintln!();
+                }
+            }
+        }
 
         results.push(TestCaseResult {
             name: case.name.clone(),
             status,
-            elapsed: exec.elapsed,
+            elapsed,
         });
     }
 
