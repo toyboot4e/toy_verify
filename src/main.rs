@@ -89,8 +89,8 @@ impl Test {
 
     fn run(&self, cache_dir: &PathBuf) -> Result<()> {
         let config_path = PathBuf::from("toy_verify/config.toml");
-        let cfg = config::parse_config(&config_path)
-            .context("failed to load toy_verify/config.toml")?;
+        let cfg =
+            config::parse_config(&config_path).context("failed to load toy_verify/config.toml")?;
         let timeout = self.tle.map(Duration::from_secs_f64);
         let mut all_success = true;
 
@@ -98,7 +98,10 @@ impl Test {
             let url = match Self::extract_url(file)? {
                 Some(url) => url,
                 None => {
-                    eprintln!("warning: no [verify]: directive found in {}", file.display());
+                    eprintln!(
+                        "warning: no [verify]: directive found in {}",
+                        file.display()
+                    );
                     continue;
                 }
             };
@@ -109,8 +112,7 @@ impl Test {
                 None => bail!("invalid Library Checker URL: {}", url),
             };
 
-            let (info, cases) =
-                problem::download_and_generate(cache_dir, &problem_id, &url, file)?;
+            let (info, cases) = problem::download_and_generate(cache_dir, &problem_id, &url, file)?;
 
             if let Some(ref compile_template) = cfg.compile {
                 let compile_cmd = config::expand(compile_template, &info);
@@ -158,7 +160,13 @@ impl Info {
 
         println!("toy_verify {}", env!("CARGO_PKG_VERSION"));
         println!();
-        println!("Config path:  {}", config_path.canonicalize().unwrap_or(config_path.clone()).display());
+        println!(
+            "Config path:  {}",
+            config_path
+                .canonicalize()
+                .unwrap_or(config_path.clone())
+                .display()
+        );
         println!("Cache dir:    {}", cache_dir.display());
         println!("Repo dir:     {}", repo_dir.display());
         println!("Repo exists:  {}", repo_dir.exists());

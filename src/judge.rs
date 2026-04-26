@@ -145,10 +145,19 @@ pub fn run_test_suite(
         let matched = if exec.timed_out {
             false
         } else if let Some(checker_path) = checker {
-            special_judge(checker_path, &case.input_path, &exec.stdout, &case.output_path)?
+            special_judge(
+                checker_path,
+                &case.input_path,
+                &exec.stdout,
+                &case.output_path,
+            )?
         } else {
-            let expected = std::fs::read_to_string(&case.output_path)
-                .with_context(|| format!("failed to read expected output: {}", case.output_path.display()))?;
+            let expected = std::fs::read_to_string(&case.output_path).with_context(|| {
+                format!(
+                    "failed to read expected output: {}",
+                    case.output_path.display()
+                )
+            })?;
             compare_output(&exec.stdout, &expected)
         };
 
@@ -174,7 +183,10 @@ pub fn run_test_suite(
 
     let total_elapsed = total_start.elapsed();
 
-    let ac_count = results.iter().filter(|r| r.status == JudgeStatus::AC).count();
+    let ac_count = results
+        .iter()
+        .filter(|r| r.status == JudgeStatus::AC)
+        .count();
     eprintln!(
         "\n{}/{} tests passed ({:.3}s)",
         ac_count,

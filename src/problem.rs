@@ -39,8 +39,7 @@ pub fn update_repository(cache_dir: &Path) -> Result<()> {
             true
         });
     } else {
-        std::fs::create_dir_all(cache_dir)
-            .context("failed to create cache directory")?;
+        std::fs::create_dir_all(cache_dir).context("failed to create cache directory")?;
         eprintln!("Cloning library-checker-problems...");
         let status = Command::new("git")
             .args(["clone", REPO_URL, path.to_str().unwrap()])
@@ -66,7 +65,11 @@ pub fn source_directory(cache_dir: &Path, problem_id: &str) -> Result<PathBuf> {
     match matches.len() {
         0 => bail!("problem '{}' not found in repository", problem_id),
         1 => Ok(matches[0].parent().unwrap().to_path_buf()),
-        _ => bail!("multiple matches for problem '{}': {:?}", problem_id, matches),
+        _ => bail!(
+            "multiple matches for problem '{}': {:?}",
+            problem_id,
+            matches
+        ),
     }
 }
 
@@ -82,10 +85,7 @@ pub fn generate_test_cases(cache_dir: &Path, problem_id: &str) -> Result<()> {
 
     eprintln!("Generating test cases for {}...", problem_id);
     let status = Command::new("python3")
-        .args([
-            generate_py.to_str().unwrap(),
-            info_toml.to_str().unwrap(),
-        ])
+        .args([generate_py.to_str().unwrap(), info_toml.to_str().unwrap()])
         .status()
         .context("failed to run generate.py")?;
 
