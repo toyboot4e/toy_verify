@@ -1,3 +1,5 @@
+//! The judge.
+
 #[cfg(test)]
 mod tests;
 
@@ -17,13 +19,18 @@ pub(crate) struct ExecResult {
     timed_out: bool,
 }
 
-fn run_command(command: &str, input_path: &Path, timeout: Option<Duration>) -> Result<ExecResult> {
+// Runs user command and compares the result with the expected value.
+fn run_user_execute_command(
+    user_execute_command: &str,
+    input_path: &Path,
+    timeout: Option<Duration>,
+) -> Result<ExecResult> {
     let input = std::fs::read(input_path)
         .with_context(|| format!("failed to read input file: {}", input_path.display()))?;
 
     let start = Instant::now();
     let mut child = Command::new("sh")
-        .args(["-c", command])
+        .args(["-c", user_execute_command])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -85,35 +92,15 @@ fn run_command(command: &str, input_path: &Path, timeout: Option<Duration>) -> R
     })
 }
 
-pub fn compare_output(actual: &str, expected: &str) -> bool {
+/// How we compare the result and the expected code. Currently, it's word_based.
+fn compare_output(actual: &str, expected: &str) -> bool {
     let actual_words: Vec<&str> = actual.split_whitespace().collect();
     let expected_words: Vec<&str> = expected.split_whitespace().collect();
     actual_words == expected_words
 }
 
-pub fn special_judge(
-    checker: &Path,
-    input: &Path,
-    actual_output: &str,
-    expected: &Path,
-) -> Result<bool> {
-    let mut tmp = std::env::temp_dir();
-    tmp.push("toy_verify_actual.out");
-    std::fs::write(&tmp, actual_output)?;
-
-    let status = Command::new(checker)
-        .args([
-            input.to_str().unwrap(),
-            expected.to_str().unwrap(),
-            tmp.to_str().unwrap(),
-        ])
-        .status()
-        .context("failed to run checker")?;
-
-    Ok(status.success())
-}
-
-pub fn determine_status(exitcode: Option<i32>, matched: bool, timed_out: bool) -> JudgeStatus {
+/// Convers the execution result to [`JudgeStatus`] (AC, WA, RE, TLE).
+fn determine_status(exitcode: Option<i32>, matched: bool, timed_out: bool) -> JudgeStatus {
     if timed_out {
         return JudgeStatus::TLE;
     }
@@ -129,10 +116,10 @@ pub fn determine_status(exitcode: Option<i32>, matched: bool, timed_out: bool) -
     }
 }
 
+/// Runs one problem.
 pub fn run_test_suite(
-    command: &str,
+    user_execute_command: &str,
     cases: &[TestCase],
-    checker: Option<&Path>,
     tle: Option<Duration>,
 ) -> Result<TestSummary> {
     let total_start = Instant::now();
@@ -140,17 +127,10 @@ pub fn run_test_suite(
     let mut all_ac = true;
 
     for case in cases {
-        let exec = run_command(command, &case.input_path, tle)?;
+        let exec = run_user_execute_command(user_execute_command, &case.input_path, tle)?;
 
         let matched = if exec.timed_out {
             false
-        } else if let Some(checker_path) = checker {
-            special_judge(
-                checker_path,
-                &case.input_path,
-                &exec.stdout,
-                &case.output_path,
-            )?
         } else {
             let expected = std::fs::read_to_string(&case.output_path).with_context(|| {
                 format!(

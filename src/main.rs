@@ -133,7 +133,7 @@ impl Test {
                 problem_id
             );
 
-            let summary = judge::run_test_suite(&execute_cmd, &cases, None, timeout)?;
+            let summary = judge::run_test_suite(&execute_cmd, &cases, timeout)?;
             if !summary.success {
                 all_success = false;
             }
