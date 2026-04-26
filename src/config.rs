@@ -1,4 +1,4 @@
-//! User configuration file `config.toml`.
+//! User configuration file (`config.toml`).
 
 #[cfg(test)]
 mod tests;

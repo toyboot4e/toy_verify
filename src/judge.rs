@@ -1,4 +1,4 @@
-//! The judge.
+//! The judge system.
 
 #[cfg(test)]
 mod tests;
@@ -149,6 +149,7 @@ pub fn run_test_suite(
         })?;
         let status = exec.judge_status(&expected);
 
+        // print one test case result
         let elapsed = exec.elapsed();
         eprintln!(
             "  {} ... {} ({:.3}s)",
@@ -178,6 +179,7 @@ pub fn run_test_suite(
     let exec_elapsed: Duration = results.iter().map(|r| r.elapsed).sum();
     let all_ac = results.iter().all(|r| r.status == JudgeStatus::AC);
 
+    // print the test suite result
     let ac_count = results
         .iter()
         .filter(|r| r.status == JudgeStatus::AC)

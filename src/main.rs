@@ -19,10 +19,11 @@ mod types;
     about = "Download and verify online judge problems"
 )]
 struct Cli {
+    /// Sub command. If it's empty, it falls back to the help command.
     #[command(subcommand)]
     command: Option<Commands>,
 
-    /// Cache directory for repository and test cases
+    /// Cache directory for problem generation repositories and test cases.
     #[arg(long)]
     cache_dir: Option<PathBuf>,
 }
@@ -56,10 +57,9 @@ struct Test {
 }
 
 impl Download {
-    fn run(&self, cache_dir: &PathBuf) -> Result<()> {
+    fn run(&self, cache_dir: &Path) -> Result<()> {
         for url in &self.urls {
-            let problem_id = problem::from_url(url);
-            let problem_id = match problem_id {
+            let problem_id = match problem::from_url(url) {
                 Some(id) => id,
                 None => bail!("invalid Library Checker URL: {}", url),
             };
@@ -92,8 +92,8 @@ impl Test {
         let cfg =
             config::parse_config(&config_path).context("failed to load toy_verify/config.toml")?;
         let timeout = Duration::from_secs_f64(self.tle.unwrap_or(30.0));
-        let mut all_success = true;
 
+        let mut summaries = Vec::new();
         for file in &self.files {
             let url = match Self::extract_url(file)? {
                 Some(url) => url,
@@ -106,10 +106,9 @@ impl Test {
                 }
             };
 
-            let problem_id = problem::from_url(&url);
-            let problem_id = match problem_id {
+            let problem_id = match problem::from_url(&url) {
                 Some(id) => id,
-                None => bail!("invalid Library Checker URL: {}", url),
+                None => bail!("invalid problem URL: {}", url),
             };
 
             let (info, cases) = problem::download_and_generate(cache_dir, &problem_id, &url, file)?;
@@ -133,13 +132,10 @@ impl Test {
                 problem_id
             );
 
-            let summary = judge::run_test_suite(&execute_cmd, &cases, timeout)?;
-            if !summary.success {
-                all_success = false;
-            }
+            summaries.push(judge::run_test_suite(&execute_cmd, &cases, timeout)?);
         }
 
-        if !all_success {
+        if !summaries.iter().all(|s| s.success) {
             process::exit(1);
         }
         Ok(())
