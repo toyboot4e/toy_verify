@@ -8,6 +8,8 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+use wait_timeout::ChildExt;
+
 use anyhow::{Context, Result};
 
 use crate::types::{JudgeStatus, TestCase, TestCaseResult, TestSummary};
@@ -99,28 +101,22 @@ fn run_user_execute_command(
         buf
     });
 
-    let deadline = start + timeout;
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) => {
-                if Instant::now() >= deadline {
-                    child.kill().ok();
-                    child.wait().ok();
-                    writer.join().ok();
-                    let stdout_bytes = reader.join().unwrap_or_default();
-                    return Ok(ExecResult::TimedOut {
-                        stdout: String::from_utf8_lossy(&stdout_bytes).to_string(),
-                        elapsed: start.elapsed(),
-                    });
-                }
-                std::thread::sleep(Duration::from_millis(50));
-            }
-            Err(e) => return Err(e.into()),
-        }
+    let wait_result = child
+        .wait_timeout(timeout)
+        .context("failed to wait for command")?;
+
+    if wait_result.is_none() {
+        child.kill().ok();
+        child.wait().ok();
+        writer.join().ok();
+        let stdout_bytes = reader.join().unwrap_or_default();
+        return Ok(ExecResult::TimedOut {
+            stdout: String::from_utf8_lossy(&stdout_bytes).to_string(),
+            elapsed: start.elapsed(),
+        });
     }
 
-    let status = child.wait().context("failed to wait for command")?;
+    let status = wait_result.unwrap();
     writer.join().ok();
     let stdout_bytes = reader.join().unwrap_or_default();
     let elapsed = start.elapsed();
