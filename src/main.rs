@@ -20,7 +20,7 @@ mod types;
 )]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 
     /// Cache directory for repository and test cases
     #[arg(long)]
@@ -33,6 +33,8 @@ enum Commands {
     Download(Download),
     /// Download test cases and run a solution against them
     Test(Test),
+    /// Show configuration paths and environment info
+    Info(Info),
 }
 
 #[derive(Parser)]
@@ -40,6 +42,9 @@ struct Download {
     /// Problem URLs (e.g. https://judge.yosupo.jp/problem/aplusb)
     urls: Vec<String>,
 }
+
+#[derive(Parser)]
+struct Info {}
 
 #[derive(Parser)]
 struct Test {
@@ -146,13 +151,47 @@ fn default_cache_dir() -> PathBuf {
         .join("toy_verify")
 }
 
+impl Info {
+    fn run(&self, cache_dir: &Path) -> Result<()> {
+        let config_path = PathBuf::from("toy_verify/config.toml");
+        let repo_dir = problem::repo_path(cache_dir);
+
+        println!("toy_verify {}", env!("CARGO_PKG_VERSION"));
+        println!();
+        println!("Config path:  {}", config_path.canonicalize().unwrap_or(config_path.clone()).display());
+        println!("Cache dir:    {}", cache_dir.display());
+        println!("Repo dir:     {}", repo_dir.display());
+        println!("Repo exists:  {}", repo_dir.exists());
+
+        match config::parse_config(&config_path) {
+            Ok(cfg) => {
+                if let Some(ref compile) = cfg.compile {
+                    println!("Compile:      {}", compile);
+                }
+                println!("Execute:      {}", cfg.execute);
+            }
+            Err(_) => {
+                println!("Config:       not found or invalid");
+            }
+        }
+
+        Ok(())
+    }
+}
+
 fn run() -> Result<()> {
     let cli = Cli::parse();
     let cache_dir = cli.cache_dir.unwrap_or_else(default_cache_dir);
 
     match cli.command {
-        Commands::Download(cmd) => cmd.run(&cache_dir),
-        Commands::Test(cmd) => cmd.run(&cache_dir),
+        Some(Commands::Download(cmd)) => cmd.run(&cache_dir),
+        Some(Commands::Test(cmd)) => cmd.run(&cache_dir),
+        Some(Commands::Info(cmd)) => cmd.run(&cache_dir),
+        None => {
+            use clap::CommandFactory;
+            Cli::command().print_help()?;
+            Ok(())
+        }
     }
 }
 
