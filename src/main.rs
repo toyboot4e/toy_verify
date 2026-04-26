@@ -23,8 +23,8 @@ struct Cli {
     command: Commands,
 
     /// Cache directory for repository and test cases
-    #[arg(long, default_value = "toy_verify/cache")]
-    cache_dir: PathBuf,
+    #[arg(long)]
+    cache_dir: Option<PathBuf>,
 }
 
 #[derive(Subcommand)]
@@ -139,12 +139,20 @@ impl Test {
     }
 }
 
+fn default_cache_dir() -> PathBuf {
+    dirs::state_dir()
+        .or_else(dirs::data_local_dir)
+        .expect("could not determine a cache directory for your platform")
+        .join("toy_verify")
+}
+
 fn run() -> Result<()> {
     let cli = Cli::parse();
+    let cache_dir = cli.cache_dir.unwrap_or_else(default_cache_dir);
 
     match cli.command {
-        Commands::Download(cmd) => cmd.run(&cli.cache_dir),
-        Commands::Test(cmd) => cmd.run(&cli.cache_dir),
+        Commands::Download(cmd) => cmd.run(&cache_dir),
+        Commands::Test(cmd) => cmd.run(&cache_dir),
     }
 }
 
