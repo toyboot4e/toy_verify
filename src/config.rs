@@ -1,3 +1,5 @@
+//! User configuration file `config.toml`.
+
 #[cfg(test)]
 mod tests;
 
@@ -8,6 +10,7 @@ use serde::Deserialize;
 
 use crate::types::ProblemInfo;
 
+/// `config.toml` file content.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub compile: Option<String>,
@@ -25,7 +28,17 @@ pub fn parse_config(path: &Path) -> Result<Config> {
     Ok(config)
 }
 
-pub fn expand(template: &str, info: &ProblemInfo) -> String {
+/// Expands user `compile` command for a specific online judge problem.
+pub fn expand_compile(template: &str, info: &ProblemInfo) -> String {
+    expand(template, info)
+}
+
+/// Expands user `execute` command for a specific online judge problem.
+pub fn expand_execute(template: &str, info: &ProblemInfo) -> String {
+    expand(template, info)
+}
+
+fn expand(template: &str, info: &ProblemInfo) -> String {
     template
         .replace("{problem}", &info.problem_id)
         .replace("{url}", &info.url)

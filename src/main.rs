@@ -115,7 +115,7 @@ impl Test {
             let (info, cases) = problem::download_and_generate(cache_dir, &problem_id, &url, file)?;
 
             if let Some(ref compile_template) = cfg.compile {
-                let compile_cmd = config::expand(compile_template, &info);
+                let compile_cmd = config::expand_compile(compile_template, &info);
                 eprintln!("Compiling: {}", compile_cmd);
                 let status = std::process::Command::new("sh")
                     .args(["-c", &compile_cmd])
@@ -126,7 +126,7 @@ impl Test {
                 }
             }
 
-            let execute_cmd = config::expand(&cfg.execute, &info);
+            let execute_cmd = config::expand_execute(&cfg.execute, &info);
             eprintln!(
                 "Running {} test cases for '{}'...\n",
                 cases.len(),
