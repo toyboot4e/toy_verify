@@ -4,11 +4,11 @@ use super::*;
 fn test_from_url_valid() {
     assert_eq!(
         from_url("https://judge.yosupo.jp/problem/aplusb"),
-        Some("aplusb".to_string())
+        Some(ProblemId::LibraryChecker("aplusb".to_string()))
     );
     assert_eq!(
         from_url("https://judge.yosupo.jp/problem/shortest_path"),
-        Some("shortest_path".to_string())
+        Some(ProblemId::LibraryChecker("shortest_path".to_string()))
     );
 }
 

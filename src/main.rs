@@ -61,7 +61,7 @@ impl Download {
         for url in &self.urls {
             let problem_id = match problem::from_url(url) {
                 Some(id) => id,
-                None => bail!("invalid Library Checker URL: {}", url),
+                None => bail!("unsupported problem URL: {}", url),
             };
 
             let (_, cases) =
@@ -108,7 +108,7 @@ impl Test {
 
             let problem_id = match problem::from_url(&url) {
                 Some(id) => id,
-                None => bail!("invalid problem URL: {}", url),
+                None => bail!("unsupported problem URL: {}", url),
             };
 
             let (info, cases) = problem::download_and_generate(cache_dir, &problem_id, &url, file)?;
